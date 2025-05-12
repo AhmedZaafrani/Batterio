@@ -1,5 +1,7 @@
 package children;
 
+import java.util.LinkedList;
+
 import main.Batterio;
 import main.Food;
 
@@ -22,13 +24,11 @@ public class Dumb  extends Batterio {
     private final int searchRadius = 15; // dove cerca il cibo
     // tempo della ricerca
     private int moveCounter = 0;
-    
-    /**
-     * Costruttore: posiziona il batterio in una posizione strategica e imposta direzione casuale
-     */
+    //per salvare le posizioni del cibo
+    private LinkedList<int[]> foodMemory = new LinkedList<>();
+
     public Dumb() {
         super(); // Chiama il costruttore della classe base
-        // (nel centro con piccola variazione casuale)
         this.x = Food.getWidth() / 2 + (int)(Math.random() * 10) - 5;
         this.y = Food.getHeight() / 2 + (int)(Math.random() * 10) - 5;
           // Inizializza con direzione casuale
@@ -40,12 +40,8 @@ public class Dumb  extends Batterio {
     protected void move() {
         // Incrementa il contatore di movimenti
         this.moveCounter++;
-        
-        // Cerca cibo ogni 3 movimenti per ottimizzare le prestazioni
-        if (this.moveCounter % 3 == 0) {
-            if (!this.targetingFood) {
-                searchForFood();
-            }
+        if(!this.targetingFood) {
+            searchForFood();
         }
         
         // Se abbiamo trovato del cibo, muoviamoci verso di esso
@@ -56,21 +52,26 @@ public class Dumb  extends Batterio {
             if (this.x == this.targetX && this.y == this.targetY) {
                 this.targetingFood = false;
             }        } else {
-            // Nessun cibo trovato nelle vicinanze, usa una strategia di esplorazione a spirale
-            // che è più efficiente rispetto al movimento casuale
+            //se non ce nessun cibo nelle vicinanze usiamo un movimento a spirale
             spiralMovement();
         }
     }
     
-    /**
-     * Cerca cibo all'interno del raggio di ricerca con strategia ottimizzata
-     */
     private void searchForFood() {
+        //usiamo questo metodo del cambio di raggio in modo da tener conto del risco di morte del batterio rendendolo piu aggrasivo se sta morendo
+
+        int dynamicRadius;
+        if (this.getHealth() < 300) {
+            dynamicRadius = 25; // raggio maggiore se la salute è bassa
+        } else {
+            dynamicRadius = 15; // raggio standard
+        }
+
         int minDistance = Integer.MAX_VALUE;
         boolean found = false;
         
         // Cerca cibo partendo dalle posizioni più vicine (più efficiente)
-        for (int radius = 1; radius <= this.searchRadius; radius++) {
+        for (int radius = 1; radius <= dynamicRadius; radius++) {
             // Controlla solo il perimetro di ogni raggio per ottimizzare
             for (int i = -radius; i <= radius; i++) {
                 // Verifica i bordi superiore e inferiore del perimetro
@@ -93,6 +94,15 @@ public class Dumb  extends Batterio {
      * Controlla se c'è cibo in una posizione specifica e aggiorna il target se necessario
      */
     private void checkFoodPosition(int checkX, int checkY, int minDistance) {
+        //evita di sprecare tempo a controllare il cibo che è già stato controllato
+        foodMemory.add(new int[]{checkX, checkY});
+        if (!foodMemory.isEmpty()) {
+            for (int[] pos : foodMemory) {
+                if (pos[0] == checkX && pos[1] == checkY) {
+                    return; // Cibo già controllato
+                }
+            }    
+        }
         // Verifica che la posizione sia dentro i limiti dell'arena
         if (checkX >= 0 && checkX < Food.getWidth() && 
             checkY >= 0 && checkY < Food.getHeight() && 
@@ -110,15 +120,22 @@ public class Dumb  extends Batterio {
         }
     }
     
-    /**
-     * Movimento a spirale per esplorare l'area in modo efficiente
-     */
     private void spiralMovement() {
-        // Periodicamente cambia direzione per creare un movimento a spirale
+        
+        // Cambia direzione casualmente ogni tanto (movimento a spirale)
         if (Math.random() < 0.07) {
             direction = (direction + 1) % 4;
         }
-        
+
+        // Se siamo troppo vicini ai bordi cambia direzione in modo più aggressivo
+        int margin = 3; 
+        if (x <= margin || x >= Food.getWidth() - 1 - margin ||
+            y <= margin || y >= Food.getHeight() - 1 - margin) {
+            
+            // simula una curva
+            direction = (direction + 1 + (int)(Math.random() * 2)) % 4;
+        }
+
         // Esegui il movimento nella direzione corrente
         switch (direction) {
             case UP:
@@ -134,8 +151,8 @@ public class Dumb  extends Batterio {
                 x--;
                 break;
         }
-        
-        // Rimbalza se raggiungiamo i bordi e cambia direzione
+
+        // Rimbalzo ai bordi (rimane come sicurezza)
         if (x <= 0) {
             x = 0;
             direction = RIGHT;
@@ -143,7 +160,7 @@ public class Dumb  extends Batterio {
             x = Food.getWidth() - 1;
             direction = LEFT;
         }
-        
+
         if (y <= 0) {
             y = 0;
             direction = DOWN;
@@ -152,10 +169,7 @@ public class Dumb  extends Batterio {
             direction = UP;
         }
     }
-    
-    /**
-     * Muove il batterio verso il cibo bersaglio usando un algoritmo ottimizzato
-     */
+
     private void moveTowardsFood() {
         // Calcola le distanze
         int dx = targetX - x;
@@ -191,6 +205,32 @@ public class Dumb  extends Batterio {
             } else {
                 y--;
                 
+            }
+        }
+        int steps;
+        if (this.getHealth() < 150) {
+            steps = 2; // se la salute è bassa, muoviti 2 volte
+        } else {
+            steps = 1; // altrimenti una sola volta
+        }
+
+         while (steps > 0 && (x != targetX || y != targetY)) {
+            steps--;
+
+            if (dx != 0) {
+                if (dx > 0) {
+                    x += 1;
+                } else {
+                    x -= 1;
+                }
+            }
+
+            if (dy != 0) {
+                if (dy > 0) {
+                    y += 1;
+                } else {
+                    y -= 1;
+                }
             }
         }
     }
