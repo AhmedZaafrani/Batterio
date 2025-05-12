@@ -6,7 +6,7 @@ import main.Food;
 /**
  *Batterio cerca il cibo
  */
-public class Dumb extends Batterio {
+public class Zymos  extends Batterio {
     // Costanti delle direzioni
     private static final int UP = 0;
     private static final int RIGHT = 1;
@@ -26,9 +26,8 @@ public class Dumb extends Batterio {
     /**
      * Costruttore: posiziona il batterio in una posizione strategica e imposta direzione casuale
      */
-    public Dumb() {
+    public Zymos() {
         super(); // Chiama il costruttore della classe base
-        // Posiziona il batterio in una zona con alta probabilità di trovare cibo
         // (nel centro con piccola variazione casuale)
         this.x = Food.getWidth() / 2 + (int)(Math.random() * 10) - 5;
         this.y = Food.getHeight() / 2 + (int)(Math.random() * 10) - 5;
@@ -198,7 +197,7 @@ public class Dumb extends Batterio {
     
     @Override
     public Batterio clone() throws CloneNotSupportedException {
-        Dumb clone = (Dumb)super.clone();
+        Zymos clone = (Zymos)super.clone();
         
         // Strategia di clonazione: posiziona il clone in una direzione diversa
         // per massimizzare la copertura dell'arena
