@@ -76,7 +76,7 @@ public class Vim extends main.Batterio{
             // Spawna al centro sotto forma di X
             int centerX = Food.getWidth() / 2;
             int centerY = Food.getHeight() / 2;
-            int maxDistance = 60; // Lunghezza massima di ciascun braccio della X
+            int maxDistance = 90; // Lunghezza massima di ciascun braccio della X
             
             // Sceglie un punto casuale su uno dei bracci della X
             double t = Math.random(); // Parametro per determinare la posizione sul braccio (0.0-1.0)
@@ -140,15 +140,20 @@ public class Vim extends main.Batterio{
 
         // Aggiorna il raggio di ricerca in base alla quantità di cibo nell'arena
         updateSearchRadius();
-
-        // Cerca cibo ogni 3 movimenti o immediatamente in modalità sopravvivenza
-        if (moveCounter % 3 == 0 || !targetingFood || survivalMode) {
-            // Se non abbiamo trovato cibo per un po', aumenta il raggio di ricerca
+        
+        // Se non stiamo già inseguendo cibo, o siamo in modalità sopravvivenza, cerca cibo immediatamente
+        if (!targetingFood || survivalMode) {
             int effectiveRadius = searchRadius;
-            if (sinceLastFood > 20 || survivalMode) {
+            // Raggio maggiore se non abbiamo trovato cibo da tempo o in modalità sopravvivenza
+            if (sinceLastFood > 15 || survivalMode) {
                 effectiveRadius = searchRadius * 2;
             }
             searchForFood(effectiveRadius);
+        }
+        // Altrimenti, cerca cibo periodicamente per trovare fonti migliori
+        else if (moveCounter % 5 == 0) {
+            // Cerca cibo ogni 5 movimenti in modalità normale
+            searchForFood(BASE_SEARCH_RADIUS);
         }
 
         // Gestione del teletrasporto in situazioni critiche o strategiche
@@ -214,11 +219,6 @@ public class Vim extends main.Batterio{
                 }
                 
                 sinceLastFood = 0; // Reset contatore
-
-                // Se abbiamo raggiunto il cibo, smettiamo di inseguirlo
-                if (this.x == this.targetX && this.y == this.targetY) {
-                    this.targetingFood = false;
-                }
             } else {
                 // Incrementa il tempo da quando non troviamo cibo
                 sinceLastFood++;
@@ -273,10 +273,13 @@ public class Vim extends main.Batterio{
         int bestX = -1;
         int bestY = -1;
 
-        // Incremento di 4 pixel per ogni iterazione del raggio di ricerca
-        for (int currentRadius = 1; currentRadius <= radius; currentRadius += 4) {
-            // Incremento di 4 pixel per ogni punto lungo il perimetro del raggio corrente
-            for (int i = -currentRadius; i <= currentRadius; i += 4) {
+        // Ottimizzazione: ricerca più rapida con incremento dinamico
+        // Utilizza incremento minore per raggi più piccoli per maggiore precisione
+        for (int currentRadius = 1; currentRadius <= radius; currentRadius += Math.max(2, currentRadius/10)) {
+            // Ricerca più intensiva sui raggi inferiori per trovare cibo vicino più rapidamente
+            int step = Math.max(2, currentRadius/8); // Incremento dinamico
+            
+            for (int i = -currentRadius; i <= currentRadius; i += step) {
                 int[] positions = {
                         this.x + i, this.y - currentRadius,
                         this.x + i, this.y + currentRadius,
@@ -301,6 +304,12 @@ public class Vim extends main.Batterio{
                     }
                 }
             }
+            
+            // Ottimizzazione: se troviamo cibo vicino, interrompi la ricerca
+            // per concentrarsi sul cibo più facilmente raggiungibile
+            if (minDistance < currentRadius * 2 && bestX != -1) {
+                break;
+            }
         }
 
         if (minDistance < Integer.MAX_VALUE) {
@@ -314,28 +323,31 @@ public class Vim extends main.Batterio{
     private void updateSearchRadius() {
         int foodQuantity = Food.getFoodQuantity();
         
+        // Adattamento dinamico del raggio di ricerca basato sulla salute attuale
+        int healthFactor = this.getHealth() < 50 ? 2 : 1; // Raggio maggiore con poca salute
+        
         // Più cibo c'è, minore è il raggio di ricerca
         if (foodQuantity > ABUNDANT_FOOD_max) {
             // Con cibo abbondante, gradualmente ritorna al raggio base
             if (searchRadius > BASE_SEARCH_RADIUS) {
-                searchRadius--;
+                searchRadius -= 2; // Riduzione più veloce con cibo abbondante
             }
         }
         // Con cibo scarso, tecniche aggressive con raggio di ricerca molto più ampio
         else if (foodQuantity < SCARCE_FOOD_min) {
             // Aumento più rapido e aggressivo del raggio di ricerca
-            if (searchRadius < BASE_SEARCH_RADIUS * 3) {
-                searchRadius += 2; // Incremento più rapido
+            if (searchRadius < BASE_SEARCH_RADIUS * 3 * healthFactor) {
+                searchRadius += 3; // Incremento ancora più rapido
             }
         }
         // Con cibo moderato, mantiene un raggio intermedio
         else {
             // Se il raggio è troppo basso, lo aumenta
-            if (searchRadius < BASE_SEARCH_RADIUS * 1.5) {
-                searchRadius++;
+            if (searchRadius < BASE_SEARCH_RADIUS * 1.5 * healthFactor) {
+                searchRadius += 2;
             }
             // Se è troppo alto, lo diminuisce
-            else if (searchRadius > BASE_SEARCH_RADIUS * 1.5) {
+            else if (searchRadius > BASE_SEARCH_RADIUS * 1.5 * healthFactor) {
                 searchRadius--;
             }
         }
@@ -343,6 +355,12 @@ public class Vim extends main.Batterio{
         // Il raggio non può mai scendere sotto il valore minimo
         if (searchRadius < BASE_SEARCH_RADIUS) {
             searchRadius = BASE_SEARCH_RADIUS;
+        }
+        
+        // Limita il raggio massimo per evitare spreco di calcoli
+        int maxRadius = BASE_SEARCH_RADIUS * 4;
+        if (searchRadius > maxRadius) {
+            searchRadius = maxRadius;
         }
     }
 
@@ -420,22 +438,43 @@ public class Vim extends main.Batterio{
         // Calcola le distanze
         int dx = targetX - x;
         int dy = targetY - y;
-
-        // Movimento ottimizzato verso il cibo
-        if (dx != 0) {
-            if (dx > 0) {
-                x++;
-            }
-            else {
-                x--;
-            }
+        
+        int moveFactor = 1; // Fattore di movimento base
+        
+        // Movimento più veloce quando la fame è alta o in sopravvivenza
+        if (survivalMode || this.getHealth() < 30) {
+            moveFactor = 2; // Movimento più rapido in situazioni critiche
         }
-        if (dy != 0) {
-            if (dy > 0) {
-                y++;
+        
+        // Movimento ottimizzato diagonalmente verso il cibo
+        if (dx != 0 && dy != 0) {
+            // Movimento diagonale (ottimizzato)
+            if (dx > 0) {
+                x += moveFactor;
+            } else {
+                x -= moveFactor;
             }
-            else {
-                y--;
+            
+            if (dy > 0) {
+                y += moveFactor;
+            } else {
+                y -= moveFactor;
+            }
+        } else {
+            // Movimento ortogonale (quando già allineati su un asse)
+            if (dx != 0) {
+                if (dx > 0) {
+                    x += moveFactor;
+                } else {
+                    x -= moveFactor;
+                }
+            }
+            if (dy != 0) {
+                if (dy > 0) {
+                    y += moveFactor;
+                } else {
+                    y -= moveFactor;
+                }
             }
         }
 
@@ -445,8 +484,17 @@ public class Vim extends main.Batterio{
         
         // Verifica se il cibo è ancora presente nella posizione target
         // Se non è più presente, smetti di inseguirlo
-        if (x == targetX && y == targetY && !Food.isFood(x, y)) {
-            targetingFood = false;
+        if (Math.abs(x - targetX) <= moveFactor && Math.abs(y - targetY) <= moveFactor) {
+            // Se siamo vicini alla destinazione, controllare se il cibo esiste ancora
+            if (!Food.isFood(targetX, targetY)) {
+                targetingFood = false;
+                // Cerca immediatamente altro cibo nelle vicinanze
+                searchForFood(BASE_SEARCH_RADIUS);
+            } else {
+                // Se il cibo esiste ancora, posizionati esattamente su di esso
+                x = targetX;
+                y = targetY;
+            }
         }
     }
 
@@ -488,28 +536,78 @@ public class Vim extends main.Batterio{
         
         // Teletrasporto verso il cibo se richiesto e se è stato rilevato un obiettivo
         if (targetedTeleport && targetingFood) {
-            // Calcola una posizione vicina al cibo (non esattamente sopra per essere realistico)
-            int distanceFromFood = 5; // Distanza dal cibo dopo il teletrasporto
-            int dx = targetX - x;
-            int dy = targetY - y;
-            
-            // Calcola la direzione verso il cibo
-            double angle = Math.atan2(dy, dx);
-            
-            // Calcola la nuova posizione vicino al cibo
-            int newX = targetX - (int)(Math.cos(angle) * distanceFromFood);
-            int newY = targetY - (int)(Math.sin(angle) * distanceFromFood);
-            
-            // Assicurati che la posizione sia all'interno dell'arena
-            x = Math.max(2, Math.min(Food.getWidth() - 3, newX));
-            y = Math.max(2, Math.min(Food.getHeight() - 3, newY));
+            // In situazioni di emergenza, teletrasporta direttamente sul cibo
+            if (this.getHealth() < EMERGENCY_TELEPORT_THRESHOLD) {
+                // Teletrasporto diretto sul cibo in caso di emergenza
+                x = targetX;
+                y = targetY;
+            } else {
+                // Calcola una posizione molto vicina al cibo (quasi sopra)
+                int distanceFromFood = 2; // Distanza ridotta per arrivare più vicino
+                int dx = targetX - x;
+                int dy = targetY - y;
+                
+                // Calcola la direzione verso il cibo
+                double angle = Math.atan2(dy, dx);
+                
+                // Calcola la nuova posizione vicino al cibo
+                int newX = targetX - (int)(Math.cos(angle) * distanceFromFood);
+                int newY = targetY - (int)(Math.sin(angle) * distanceFromFood);
+                
+                // Assicurati che la posizione sia all'interno dell'arena
+                x = Math.max(2, Math.min(Food.getWidth() - 3, newX));
+                y = Math.max(2, Math.min(Food.getHeight() - 3, newY));
+            }
         } 
-        // Teletrasporto casuale se non è specificato un obiettivo o non ne è stato trovato uno
+        // Teletrasporto intelligente in cerca di cibo se non è specificato un obiettivo
         else {
-            // Per il teletrasporto casuale, evita i bordi dell'arena
-            int margin = 20;
-            x = margin + (int)(Math.random() * (Food.getWidth() - 2 * margin));
-            y = margin + (int)(Math.random() * (Food.getHeight() - 2 * margin));
+            boolean foundFood = false;
+            // Prima cerca di trovare cibo in zone casuali ma potenzialmente ricche di cibo
+            
+            // Se la quantità di cibo è scarsa, tentiamo di trovare cibo negli angoli
+            if (Food.getFoodQuantity() < SCARCE_FOOD_min) {
+                // Seleziona un angolo a caso
+                int corner = (int)(Math.random() * 4);
+                int margin = 40; // Margine dall'angolo
+                
+                switch (corner) {
+                    case 0: // Angolo in alto a sinistra
+                        x = margin + (int)(Math.random() * margin);
+                        y = margin + (int)(Math.random() * margin);
+                        break;
+                    case 1: // Angolo in alto a destra
+                        x = Food.getWidth() - margin - (int)(Math.random() * margin);
+                        y = margin + (int)(Math.random() * margin);
+                        break;
+                    case 2: // Angolo in basso a sinistra
+                        x = margin + (int)(Math.random() * margin);
+                        y = Food.getHeight() - margin - (int)(Math.random() * margin);
+                        break;
+                    case 3: // Angolo in basso a destra
+                        x = Food.getWidth() - margin - (int)(Math.random() * margin);
+                        y = Food.getHeight() - margin - (int)(Math.random() * margin);
+                        break;
+                }
+                
+                // Cerca cibo nella nuova posizione
+                searchForFood(BASE_SEARCH_RADIUS);
+                if (targetingFood) {
+                    foundFood = true;
+                    // Ulteriore teletrasporto verso il cibo trovato
+                    teleport(true);
+                }
+            }
+            
+            // Se non abbiamo ancora trovato cibo, teletrasporto casuale standard
+            if (!foundFood) {
+                // Per il teletrasporto casuale, evita i bordi dell'arena
+                int margin = 20;
+                x = margin + (int)(Math.random() * (Food.getWidth() - 2 * margin));
+                y = margin + (int)(Math.random() * (Food.getHeight() - 2 * margin));
+                
+                // Cerca immediatamente cibo nella nuova posizione
+                searchForFood(BASE_SEARCH_RADIUS * 2);
+            }
         }
         
         // Applica il costo energetico e il cooldown
