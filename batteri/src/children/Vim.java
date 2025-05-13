@@ -34,6 +34,16 @@ public class Vim extends main.Batterio{
     private boolean survivalMode = false;
     // Modalità di conservazione della massa dei batteri
     private boolean conservationMode = false;
+
+    // Variabile per limitare l'uso del teletrasporto
+    private int teleportCooldown = 0;
+    private static final int TELEPORT_COOLDOWN_MAX = 50; // Attesa tra teletrasporti
+    private static final int TELEPORT_ENERGY_COST = 25; // Costo energetico del teletrasporto
+    // Soglia critica di salute per attivare il teletrasporto d'emergenza
+    private static final int EMERGENCY_TELEPORT_THRESHOLD = 15;
+    // Distanza minima per considerare il teletrasporto al cibo
+    private static final int TELEPORT_DISTANCE_THRESHOLD = 80;
+
     public Vim() {
         super(); // Chiama il costruttore della classe base
         
@@ -102,6 +112,11 @@ public class Vim extends main.Batterio{
 
     @Override
     protected void move() {
+        // Decrementa il cooldown del teletrasporto se necessario
+        if (teleportCooldown > 0) {
+            teleportCooldown--;
+        }
+
         // Incrementa il contatore di movimenti
         this.moveCounter++;
 
@@ -110,7 +125,9 @@ public class Vim extends main.Batterio{
             survivalMode = true;
         } else if (this.getHealth() > 80) {
             survivalMode = false;
-        }        // Verifica se attivare la modalità di conservazione
+        }
+        
+        // Verifica se attivare la modalità di conservazione
         // basata sulla quantità di cibo disponibile
         boolean previousMode = conservationMode;
         conservationMode = Food.getFoodQuantity() < SCARCE_FOOD_min;
@@ -134,6 +151,30 @@ public class Vim extends main.Batterio{
             searchForFood(effectiveRadius);
         }
 
+        // Gestione del teletrasporto in situazioni critiche o strategiche
+        if (this.getHealth() <= EMERGENCY_TELEPORT_THRESHOLD && teleportCooldown <= 0) {
+            // Teletrasporto d'emergenza verso del cibo se possibile
+            if (targetingFood) {
+                if (teleport(true)) {
+                    return; // Se il teletrasporto è riuscito, termina il movimento
+                }
+            } else {
+                // Teletrasporto casuale d'emergenza
+                if (teleport(false)) {
+                    return; // Se il teletrasporto è riuscito, termina il movimento
+                }
+            }
+        }
+        // Teletrasporto strategico quando il cibo è molto lontano
+        else if (targetingFood && teleportCooldown <= 0 && this.getHealth() > TELEPORT_ENERGY_COST*2) {
+            int distToFood = Math.abs(targetX - x) + Math.abs(targetY - y);
+            if (distToFood > TELEPORT_DISTANCE_THRESHOLD) {
+                if (teleport(true)) {
+                    return; // Se il teletrasporto è riuscito, termina il movimento
+                }
+            }
+        }
+
         // Modalità cibo abbondante: comportamento potenziato
         if (isFoodAbundant()) {
             // Movimento accelerato verso il cibo
@@ -155,7 +196,9 @@ public class Vim extends main.Batterio{
             if (this.getHealth() < 60 && this.getHealth() > 30 && !targetingFood && !survivalMode) {
                 sinceLastFood++;
                 return; // Risparmia energia
-            }        // Se abbiamo trovato del cibo, muoviamoci verso di esso
+            }
+            
+            // Se abbiamo trovato del cibo, muoviamoci verso di esso
             if (this.targetingFood) {
                 moveTowardsFood();
                 
@@ -264,7 +307,8 @@ public class Vim extends main.Batterio{
             this.targetingFood = true;
             this.targetX = bestX;
             this.targetY = bestY;
-        }    }
+        }
+    }
 
     // Metodo per aggiornare il raggio di ricerca in base alla quantità di cibo
     private void updateSearchRadius() {
@@ -302,75 +346,75 @@ public class Vim extends main.Batterio{
         }
     }
 
-        private void spiralMovement() {
-            int arenaWidth = Food.getWidth();
-            int arenaHeight = Food.getHeight();
+    private void spiralMovement() {
+        int arenaWidth = Food.getWidth();
+        int arenaHeight = Food.getHeight();
 
-            int margin = 3; // distanza minima dai bordi
+        int margin = 3; // distanza minima dai bordi
 
-            // Cambio direzione sensato se vicino ai bordi
-            boolean nearLeft = x <= margin;
-            boolean nearRight = x >= arenaWidth - 1 - margin;
-            boolean nearTop = y <= margin;
-            boolean nearBottom = y >= arenaHeight - 1 - margin;
+        // Cambio direzione sensato se vicino ai bordi
+        boolean nearLeft = x <= margin;
+        boolean nearRight = x >= arenaWidth - 1 - margin;
+        boolean nearTop = y <= margin;
+        boolean nearBottom = y >= arenaHeight - 1 - margin;
 
-            // Se vicino a un bordo, cambia direzione in senso orario
-            if (nearLeft && direction == LEFT) {
-                direction = UP;
-            }
-            else if (nearTop && direction == UP) {
-                direction = RIGHT;
-            }
-            else if (nearRight && direction == RIGHT) {
-                direction = DOWN;
-            }
-            else if (nearBottom && direction == DOWN) {
-                direction = LEFT;
-            }
+        // Se vicino a un bordo, cambia direzione in senso orario
+        if (nearLeft && direction == LEFT) {
+            direction = UP;
+        }
+        else if (nearTop && direction == UP) {
+            direction = RIGHT;
+        }
+        else if (nearRight && direction == RIGHT) {
+            direction = DOWN;
+        }
+        else if (nearBottom && direction == DOWN) {
+            direction = LEFT;
+        }
 
-            // Frequenza di cambio direzione basata su modalità esplorazione
-            int turnFrequency = isExploring ? 5 : 10;
+        // Frequenza di cambio direzione basata su modalità esplorazione
+        int turnFrequency = isExploring ? 5 : 10;
 
-            // Cambia direzione per simulare "spirale"
-            if (moveCounter % turnFrequency == 0) {
-                direction = (direction + 1) % 4;
-            }
+        // Cambia direzione per simulare "spirale"
+        if (moveCounter % turnFrequency == 0) {
+            direction = (direction + 1) % 4;
+        }
 
-            // Esegui il movimento nella direzione corrente
-            switch (direction) {
-                case UP:
-                    y--;
-                    break;
-                case RIGHT:
-                    x++;
-                    break;
-                case DOWN:
-                    y++;
-                    break;
-                case LEFT:
-                    x--;
-                    break;
-            }
+        // Esegui il movimento nella direzione corrente
+        switch (direction) {
+            case UP:
+                y--;
+                break;
+            case RIGHT:
+                x++;
+                break;
+            case DOWN:
+                y++;
+                break;
+            case LEFT:
+                x--;
+                break;
+        }
 
-            // Rimbalzo ai bordi come ultima sicurezza
-            if (x <= 0) {
-                x = 0;
-                direction = RIGHT;
-            }
-            else if (x >= arenaWidth - 1) {
-                x = arenaWidth - 1;
-                direction = LEFT;
-            }
+        // Rimbalzo ai bordi come ultima sicurezza
+        if (x <= 0) {
+            x = 0;
+            direction = RIGHT;
+        }
+        else if (x >= arenaWidth - 1) {
+            x = arenaWidth - 1;
+            direction = LEFT;
+        }
 
-            if (y <= 0) {
-                y = 0;
-                direction = DOWN;
-            }
-            else if (y >= arenaHeight - 1) {
-                y = arenaHeight - 1;
-                direction = UP;
-            }
-}
+        if (y <= 0) {
+            y = 0;
+            direction = DOWN;
+        }
+        else if (y >= arenaHeight - 1) {
+            y = arenaHeight - 1;
+            direction = UP;
+        }
+    }
 
     private void moveTowardsFood() {
         // Calcola le distanze
@@ -398,6 +442,81 @@ public class Vim extends main.Batterio{
         // Mantenimento entro i bordi
         x = Math.max(0, Math.min(Food.getWidth() - 1, x));
         y = Math.max(0, Math.min(Food.getHeight() - 1, y));
+        
+        // Verifica se il cibo è ancora presente nella posizione target
+        // Se non è più presente, smetti di inseguirlo
+        if (x == targetX && y == targetY && !Food.isFood(x, y)) {
+            targetingFood = false;
+        }
+    }
+
+    /**
+     * Riduce la salute del batterio di un valore specificato
+     * Utilizza riflessione per accedere al campo privato health nella classe parent
+     * @param amount la quantità di salute da diminuire
+     */
+    private void decreaseHealth(int amount) {
+        // Accediamo direttamente alla proprietà health nella classe genitore
+        try {
+            // Otteniamo il campo 'health' dalla superclasse
+            java.lang.reflect.Field healthField = main.Batterio.class.getDeclaredField("health");
+            // Rendiamo accessibile il campo privato
+            healthField.setAccessible(true);
+            // Otteniamo il valore corrente
+            int currentHealth = (int) healthField.get(this);
+            // Aggiorniamo il valore
+            healthField.set(this, currentHealth - amount);
+            // Ripristiniamo l'accesso
+            healthField.setAccessible(false);
+        } catch (Exception e) {
+            // Se non riusciamo ad accedere direttamente, non facciamo nulla
+            // La salute verrà comunque decrementata dal movimento normale
+        }
+    }
+
+    /**
+     * Permette al batterio di teletrasportarsi in un'altra posizione dell'arena
+     * Ha un costo energetico e un tempo di ricarica
+     * @param targetedTeleport se true, tenta di teletrasportarsi verso del cibo rilevato
+     * @return true se il teletrasporto è avvenuto con successo, false altrimenti
+     */
+    public boolean teleport(boolean targetedTeleport) {
+        // Verifica se il batterio può teletrasportarsi (cooldown e salute sufficienti)
+        if (teleportCooldown > 0 || this.getHealth() < TELEPORT_ENERGY_COST + 10) {
+            return false;
+        }
+        
+        // Teletrasporto verso il cibo se richiesto e se è stato rilevato un obiettivo
+        if (targetedTeleport && targetingFood) {
+            // Calcola una posizione vicina al cibo (non esattamente sopra per essere realistico)
+            int distanceFromFood = 5; // Distanza dal cibo dopo il teletrasporto
+            int dx = targetX - x;
+            int dy = targetY - y;
+            
+            // Calcola la direzione verso il cibo
+            double angle = Math.atan2(dy, dx);
+            
+            // Calcola la nuova posizione vicino al cibo
+            int newX = targetX - (int)(Math.cos(angle) * distanceFromFood);
+            int newY = targetY - (int)(Math.sin(angle) * distanceFromFood);
+            
+            // Assicurati che la posizione sia all'interno dell'arena
+            x = Math.max(2, Math.min(Food.getWidth() - 3, newX));
+            y = Math.max(2, Math.min(Food.getHeight() - 3, newY));
+        } 
+        // Teletrasporto casuale se non è specificato un obiettivo o non ne è stato trovato uno
+        else {
+            // Per il teletrasporto casuale, evita i bordi dell'arena
+            int margin = 20;
+            x = margin + (int)(Math.random() * (Food.getWidth() - 2 * margin));
+            y = margin + (int)(Math.random() * (Food.getHeight() - 2 * margin));
+        }
+        
+        // Applica il costo energetico e il cooldown
+        this.decreaseHealth(TELEPORT_ENERGY_COST);
+        teleportCooldown = TELEPORT_COOLDOWN_MAX;
+        
+        return true;
     }
 
     @Override
@@ -436,7 +555,8 @@ public class Vim extends main.Batterio{
             } else {
                 variationY = 0;
             }
-        }        // Con conservationMode attiva (cibo scarso), strategie di clonazione aggressive
+        }
+        // Con conservationMode attiva (cibo scarso), strategie di clonazione aggressive
         else if (conservationMode) {
             // Quando il cibo è scarso, i cloni si muovono in direzioni diametralmente opposte per massimizzare l'area di ricerca
             int direction = moveCounter % 4;
