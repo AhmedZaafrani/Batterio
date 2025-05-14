@@ -45,7 +45,8 @@ public class Vim extends main.Batterio{
     // Soglia critica di salute per attivare il teletrasporto d'emergenza
     private static final int EMERGENCY_TELEPORT_THRESHOLD = 15;
     // Distanza minima per considerare il teletrasporto al cibo
-    private static final int TELEPORT_DISTANCE_THRESHOLD = 90;    public Vim() {
+    private static final int TELEPORT_DISTANCE_THRESHOLD = 90;    
+    public Vim() {
         super(); // Chiama il costruttore della classe base
         
         // Determina se questo batterio deve apparire al centro o vicino ai bordi (ottimale per trovare cibo)
