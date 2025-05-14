@@ -105,7 +105,7 @@ public class Vim extends main.Batterio{
         // Distanza dal bordo per trovare il centro dell'angolo
         int spaziatura = 140;
         // Dimensione del pattern X negli angoli
-        int maxDistance = 80;
+        int maxDistance = 200;
         
         int centerX, centerY;
         
@@ -160,9 +160,7 @@ public class Vim extends main.Batterio{
     // Controlla se la quantità di cibo è abbondante
     private boolean isFoodAbundant() {
         return Food.getFoodQuantity() > ABUNDANT_FOOD_max;
-    }
-
-    @Override
+    }    @Override
     protected void move() {
         // Decrementa il cooldown del teletrasporto se necessario
         if (teleportCooldown > 0) {
@@ -171,6 +169,13 @@ public class Vim extends main.Batterio{
 
         // Incrementa il contatore di movimenti
         this.moveCounter++;
+
+        // Controlla prima se siamo già su del cibo
+        if (Food.isFood(x, y)) {
+            // Se siamo già su del cibo, controlla se c'è altro cibo nelle vicinanze
+            scanAndEatAdjacentFood();
+            return; // Abbiamo consumato cibo, termina qui il movimento
+        }
 
         // Attiva la modalità di sopravvivenza se la salute è molto bassa
         if (this.getHealth() < 30) {
@@ -329,13 +334,33 @@ public class Vim extends main.Batterio{
             y = Food.getHeight() - 4;
             direction = UP;
         }
-    }
+    }      private void searchForFood(int radius) {
+        // Prima controlla se c'è cibo nella posizione attuale
+        if (Food.isFood(x, y)) {
+            this.targetingFood = true;
+            this.targetX = x;
+            this.targetY = y;
+            this.isOnXPattern = false;
+            return;
+        }
+        
+        // Poi controlla se c'è cibo nelle immediate vicinanze
+        int smallRadius = 5; // Controllo ravvicinato prima di fare una ricerca più ampia
+        boolean foundNearbyFood = searchInArea(smallRadius);
+        if (foundNearbyFood) {
+            return; // Se abbiamo trovato cibo nelle immediate vicinanze, non serve cercare oltre
+        }
 
-      private void searchForFood(int radius) {
         int minDistance = Integer.MAX_VALUE;
         int bestX = -1;
         int bestY = -1;
-
+        
+        // Controlla se ci sono gruppi di cibo invece che singole unità
+        // Utilizziamo una mappa per tenere traccia della densità di cibo nelle diverse aree
+        int[][] foodDensity = new int[5][5]; // Dividiamo l'arena in una griglia 5x5
+        int gridWidth = Food.getWidth() / 5;
+        int gridHeight = Food.getHeight() / 5;
+        
         // Ottimizzazione: ricerca più rapida con incremento dinamico
         // Utilizza incremento minore per raggi più piccoli per maggiore precisione
         for (int currentRadius = 1; currentRadius <= radius; currentRadius += Math.max(2, currentRadius/10)) {
@@ -355,14 +380,20 @@ public class Vim extends main.Batterio{
                     int checkY = positions[j + 1];
 
                     if (checkX >= 0 && checkX < Food.getWidth() &&
-                            checkY >= 0 && checkY < Food.getHeight() &&
-                            Food.isFood(checkX, checkY)) {
-
-                        int distance = Math.abs(checkX - x) + Math.abs(checkY - y);
-                        if (distance < minDistance) {
-                            minDistance = distance;
-                            bestX = checkX;
-                            bestY = checkY;
+                            checkY >= 0 && checkY < Food.getHeight()) {
+                        
+                        if (Food.isFood(checkX, checkY)) {
+                            // Aggiorniamo la mappa della densità
+                            int gridX = Math.min(checkX / gridWidth, 4);
+                            int gridY = Math.min(checkY / gridHeight, 4);
+                            foodDensity[gridX][gridY]++;
+                            
+                            int distance = Math.abs(checkX - x) + Math.abs(checkY - y);
+                            if (distance < minDistance) {
+                                minDistance = distance;
+                                bestX = checkX;
+                                bestY = checkY;
+                            }
                         }
                     }
                 }
@@ -372,6 +403,46 @@ public class Vim extends main.Batterio{
             // per concentrarsi sul cibo più facilmente raggiungibile
             if (minDistance < currentRadius * 2 && bestX != -1) {
                 break;
+            }
+        }
+        
+        // Controlla se ci sono aree con alta densità di cibo
+        int maxDensity = 0;
+        int bestGridX = -1;
+        int bestGridY = -1;
+        
+        for (int i = 0; i < 5; i++) {
+            for (int j = 0; j < 5; j++) {
+                if (foodDensity[i][j] > maxDensity) {
+                    maxDensity = foodDensity[i][j];
+                    bestGridX = i;
+                    bestGridY = j;
+                }
+            }
+        }
+        
+        // Se troviamo un'area con molta densità di cibo, dirigiamoci lì invece che verso un singolo punto
+        if (maxDensity > 5) {
+            // Troviamo il centro dell'area ad alta densità
+            int centerX = bestGridX * gridWidth + gridWidth / 2;
+            int centerY = bestGridY * gridHeight + gridHeight / 2;
+            
+            // Verifichiamo che ci sia davvero del cibo in quell'area
+            boolean foundFoodInDenseArea = false;
+            int searchArea = 15; // Raggio di ricerca nell'area densa
+            for (int i = -searchArea; i <= searchArea && !foundFoodInDenseArea; i += 3) {
+                for (int j = -searchArea; j <= searchArea && !foundFoodInDenseArea; j += 3) {
+                    int checkX = centerX + i;
+                    int checkY = centerY + j;
+                    
+                    if (checkX >= 0 && checkX < Food.getWidth() &&
+                        checkY >= 0 && checkY < Food.getHeight() &&
+                        Food.isFood(checkX, checkY)) {
+                        bestX = checkX;
+                        bestY = checkY;
+                        foundFoodInDenseArea = true;
+                    }
+                }
             }
         }
 
@@ -392,7 +463,34 @@ public class Vim extends main.Batterio{
             }
         }
     }
-
+    
+    /**
+     * Cerca cibo in un'area ristretta attorno alla posizione attuale
+     * @param range il raggio di ricerca
+     * @return true se è stato trovato del cibo
+     */
+    private boolean searchInArea(int range) {
+        // Scansiona un'area quadrata attorno alla posizione attuale
+        for (int i = -range; i <= range; i++) {
+            for (int j = -range; j <= range; j++) {
+                int checkX = x + i;
+                int checkY = y + j;
+                
+                if (checkX >= 0 && checkX < Food.getWidth() &&
+                    checkY >= 0 && checkY < Food.getHeight() &&
+                    Food.isFood(checkX, checkY)) {
+                    
+                    // Abbiamo trovato del cibo nelle vicinanze
+                    this.targetingFood = true;
+                    this.targetX = checkX;
+                    this.targetY = checkY;
+                    this.isOnXPattern = false;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
     // Metodo per aggiornare il raggio di ricerca in base alla quantità di cibo
     private void updateSearchRadius() {
         int foodQuantity = Food.getFoodQuantity();
@@ -506,9 +604,14 @@ public class Vim extends main.Batterio{
             y = arenaHeight - 1;
             direction = UP;
         }
-    }
-
-    private void moveTowardsFood() {
+    }    private void moveTowardsFood() {
+        // Prima verifica se c'è cibo nella posizione attuale
+        if (Food.isFood(x, y)) {
+            // Siamo già su del cibo, controlliamo se c'è altro cibo adiacente
+            scanAndEatAdjacentFood();
+            return; // Abbiamo consumato cibo, termina qui il movimento
+        }
+        
         // Calcola le distanze
         int dx = targetX - x;
         int dy = targetY - y;
@@ -556,9 +659,13 @@ public class Vim extends main.Batterio{
         x = Math.max(0, Math.min(Food.getWidth() - 1, x));
         y = Math.max(0, Math.min(Food.getHeight() - 1, y));
         
-        // Verifica se il cibo è ancora presente nella posizione target
-        // Se non è più presente, smetti di inseguirlo
-        if (Math.abs(x - targetX) <= moveFactor && Math.abs(y - targetY) <= moveFactor) {
+        // Verifica se c'è cibo sulla posizione attuale dopo il movimento
+        if (Food.isFood(x, y)) {
+            // Se c'è cibo nella nuova posizione, controlla anche le celle adiacenti
+            scanAndEatAdjacentFood();
+        }
+        // Altrimenti continua verso il target originale
+        else if (Math.abs(x - targetX) <= moveFactor && Math.abs(y - targetY) <= moveFactor) {
             // Se siamo vicini alla destinazione, controllare se il cibo esiste ancora
             if (!Food.isFood(targetX, targetY)) {
                 targetingFood = false;
@@ -568,10 +675,58 @@ public class Vim extends main.Batterio{
                 // Se il cibo esiste ancora, posizionati esattamente su di esso
                 x = targetX;
                 y = targetY;
+                // E cerca anche nelle celle adiacenti
+                scanAndEatAdjacentFood();
             }
         }
     }
-
+    
+    /**
+     * Scansione e consumo del cibo nelle celle adiacenti
+     * Permette al batterio di mangiare tutto il cibo presente in un'area
+     */
+    private void scanAndEatAdjacentFood() {
+        // Mantieni traccia se hai trovato altro cibo nelle vicinanze
+        boolean foundMoreFood = false;
+        int scanRange = 3; // Raggio di scansione attorno alla posizione attuale
+        int closestFoodX = -1;
+        int closestFoodY = -1;
+        int minDistance = Integer.MAX_VALUE;
+        
+        // Scansiona un'area quadrata intorno alla posizione attuale
+        for (int i = -scanRange; i <= scanRange; i++) {
+            for (int j = -scanRange; j <= scanRange; j++) {
+                int checkX = x + i;
+                int checkY = y + j;
+                
+                // Verifica che la posizione sia valida e contenga cibo
+                if (checkX >= 0 && checkX < Food.getWidth() && 
+                    checkY >= 0 && checkY < Food.getHeight() && 
+                    Food.isFood(checkX, checkY)) {
+                    
+                    // Calcola la distanza
+                    int distance = Math.abs(i) + Math.abs(j);
+                    
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestFoodX = checkX;
+                        closestFoodY = checkY;
+                        foundMoreFood = true;
+                    }
+                }
+            }
+        }
+        
+        // Se trovato altro cibo nelle vicinanze, aggiorna il target
+        if (foundMoreFood) {
+            targetX = closestFoodX;
+            targetY = closestFoodY;
+        } else {
+            // Se non c'è più cibo nelle immediate vicinanze, cerca in un'area più ampia
+            targetingFood = false;
+            searchForFood(BASE_SEARCH_RADIUS);
+        }
+    }
     /**
      * Riduce la salute del batterio di un valore specificato
      * Utilizza riflessione per accedere al campo privato health nella classe parent
