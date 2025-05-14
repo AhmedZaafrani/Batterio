@@ -16,7 +16,7 @@ public class Vim extends main.Batterio{
     private int targetX;
     private int targetY;
     // Raggio base e dinamico per la ricerca del cibo
-    private final int BASE_SEARCH_RADIUS = 60;
+    private final int BASE_SEARCH_RADIUS = 100;
     private int searchRadius; // Raggio di ricerca dinamico
     // tempo della ricerca
     private int moveCounter = 0;
