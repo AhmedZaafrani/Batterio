@@ -35,66 +35,27 @@ public class Vim extends main.Batterio{
     // Modalità di conservazione della massa dei batteri
     private boolean conservationMode = false;
 
+    // Flag per tracciare se il batterio è stato posto su un pattern X
+    private boolean isOnXPattern = false;
+    
     // Variabile per limitare l'uso del teletrasporto
     private int teleportCooldown = 0;
-    private static final int TELEPORT_COOLDOWN_MAX = 50; // Attesa tra teletrasporti
+    private static final int TELEPORT_COOLDOWN_MAX = 30; // Attesa tra teletrasporti
     private static final int TELEPORT_ENERGY_COST = 25; // Costo energetico del teletrasporto
     // Soglia critica di salute per attivare il teletrasporto d'emergenza
     private static final int EMERGENCY_TELEPORT_THRESHOLD = 15;
     // Distanza minima per considerare il teletrasporto al cibo
-    private static final int TELEPORT_DISTANCE_THRESHOLD = 80;
-
-    public Vim() {
+    private static final int TELEPORT_DISTANCE_THRESHOLD = 90;    public Vim() {
         super(); // Chiama il costruttore della classe base
         
         // Determina se questo batterio deve apparire al centro o vicino ai bordi (ottimale per trovare cibo)
         boolean spawnNearEdge = Math.random() < 0.5; // 50% di probabilità
-          if (spawnNearEdge) {
-            // Spawna al centro degli angoli (ottimale per trovare cibo)
-            int corner = (int)(Math.random() * 4);
-            int variazione = 20; // Variazione casuale attorno al centro dell'angolo
-            int spaziatura = 100; // Distanza dal bordo per trovare il centro dell'angolo
-            
-            switch (corner) {
-                case 0: // Angolo in alto a sinistra
-                    this.x = spaziatura + (int)(Math.random() * variazione) - variazione/2;
-                    this.y = spaziatura + (int)(Math.random() * variazione) - variazione/2;
-                    break;
-                case 1: // Angolo in alto a destra
-                    this.x = Food.getWidth() - spaziatura + (int)(Math.random() * variazione) - variazione/2;
-                    this.y = spaziatura + (int)(Math.random() * variazione) - variazione/2;
-                    break;
-                case 2: // Angolo in basso a sinistra
-                    this.x = spaziatura + (int)(Math.random() * variazione) - variazione/2;
-                    this.y = Food.getHeight() - spaziatura + (int)(Math.random() * variazione) - variazione/2;
-                    break;
-                case 3: // Angolo in basso a destra
-                    this.x = Food.getWidth() - spaziatura + (int)(Math.random() * variazione) - variazione/2;
-                    this.y = Food.getHeight() - spaziatura + (int)(Math.random() * variazione) - variazione/2;
-                    break;
-            }        } else {
+        if (spawnNearEdge) {
+            // Spawna negli angoli con pattern X
+            arrangeInXPatternFromCorner();
+        } else {
             // Spawna al centro sotto forma di X
-            int centerX = Food.getWidth() / 2;
-            int centerY = Food.getHeight() / 2;
-            int maxDistance = 90; // Lunghezza massima di ciascun braccio della X
-            
-            // Sceglie un punto casuale su uno dei bracci della X
-            double t = Math.random(); // Parametro per determinare la posizione sul braccio (0.0-1.0)
-            boolean diagonalePrincipale = Math.random() < 0.5; // Scelta casuale tra le due diagonali
-            
-            if (diagonalePrincipale) {
-                // Diagonale principale (alto-sx a basso-dx)
-                int offsetX = (int)(maxDistance * t) - maxDistance/2;
-                int offsetY = offsetX; // Stessa direzione per creare la diagonale principale
-                this.x = centerX + offsetX;
-                this.y = centerY + offsetY;
-            } else {
-                // Diagonale secondaria (alto-dx a basso-sx)
-                int offsetX = (int)(maxDistance * t) - maxDistance/2;
-                int offsetY = -offsetX; // Direzione opposta per creare la diagonale secondaria
-                this.x = centerX + offsetX;
-                this.y = centerY + offsetY;
-            }
+            arrangeInXPatternFromCenter();
         }
         
         // Inizializza con direzione casuale
@@ -103,6 +64,96 @@ public class Vim extends main.Batterio{
 
         // Inizializza il raggio di ricerca con un valore alto per i batteri appena nati
         this.searchRadius = BASE_SEARCH_RADIUS * 2; // Raggio doppio all'inizio
+    }
+    
+    /**
+     * Posiziona il batterio in un pattern X centrato nell'arena
+     */
+    private void arrangeInXPatternFromCenter() {
+        int centerX = Food.getWidth() / 2;
+        int centerY = Food.getHeight() / 2;
+        int maxDistance = 250; // Lunghezza massima di ciascun braccio della X
+        
+        // Sceglie un punto casuale su uno dei bracci della X
+        double t = Math.random(); // Parametro per determinare la posizione sul braccio (0.0-1.0)
+        boolean diagonalePrincipale = Math.random() < 0.5; // Scelta casuale tra le due diagonali
+        
+        if (diagonalePrincipale) {
+            // Diagonale principale (alto-sx a basso-dx)
+            int offsetX = (int)(maxDistance * t) - maxDistance/2;
+            int offsetY = offsetX; // Stessa direzione per creare la diagonale principale
+            this.x = centerX + offsetX;
+            this.y = centerY + offsetY;
+        } else {
+            // Diagonale secondaria (alto-dx a basso-sx)
+            int offsetX = (int)(maxDistance * t) - maxDistance/2;
+            int offsetY = -offsetX; // Direzione opposta per creare la diagonale secondaria
+            this.x = centerX + offsetX;
+            this.y = centerY + offsetY;
+        }
+        
+        isOnXPattern = true;
+    }
+    
+    /**
+     * Posiziona il batterio in un pattern X centrato in uno degli angoli dell'arena
+     */
+    private void arrangeInXPatternFromCorner() {
+        // Seleziona un angolo casuale
+        int corner = (int)(Math.random() * 4);
+        // Distanza dal bordo per trovare il centro dell'angolo
+        int spaziatura = 140;
+        // Dimensione del pattern X negli angoli
+        int maxDistance = 80;
+        
+        int centerX, centerY;
+        
+        // Determina le coordinate del centro dell'angolo
+        switch (corner) {
+            case 0: // Angolo in alto a sinistra
+                centerX = spaziatura;
+                centerY = spaziatura;
+                break;
+            case 1: // Angolo in alto a destra
+                centerX = Food.getWidth() - spaziatura;
+                centerY = spaziatura;
+                break;
+            case 2: // Angolo in basso a sinistra
+                centerX = spaziatura;
+                centerY = Food.getHeight() - spaziatura;
+                break;
+            case 3: // Angolo in basso a destra
+                centerX = Food.getWidth() - spaziatura;
+                centerY = Food.getHeight() - spaziatura;
+                break;
+            default:
+                centerX = spaziatura;
+                centerY = spaziatura;
+        }
+        
+        // Ora crea il pattern X centrato nell'angolo selezionato
+        double t = Math.random(); // Posizione casuale sul braccio della X
+        boolean diagonalePrincipale = Math.random() < 0.5; // Scelta casuale tra le due diagonali
+        
+        if (diagonalePrincipale) {
+            // Diagonale principale (alto-sx a basso-dx)
+            int offsetX = (int)(maxDistance * t) - maxDistance/2;
+            int offsetY = offsetX; // Stessa direzione per creare la diagonale principale
+            this.x = centerX + offsetX;
+            this.y = centerY + offsetY;
+        } else {
+            // Diagonale secondaria (alto-dx a basso-sx)
+            int offsetX = (int)(maxDistance * t) - maxDistance/2;
+            int offsetY = -offsetX; // Direzione opposta per creare la diagonale secondaria
+            this.x = centerX + offsetX;
+            this.y = centerY + offsetY;
+        }
+        
+        // Assicurati che la posizione sia all'interno dell'arena
+        this.x = Math.max(2, Math.min(Food.getWidth() - 3, this.x));
+        this.y = Math.max(2, Math.min(Food.getHeight() - 3, this.y));
+        
+        isOnXPattern = true;
     }
 
     // Controlla se la quantità di cibo è abbondante
@@ -140,8 +191,7 @@ public class Vim extends main.Batterio{
 
         // Aggiorna il raggio di ricerca in base alla quantità di cibo nell'arena
         updateSearchRadius();
-        
-        // Se non stiamo già inseguendo cibo, o siamo in modalità sopravvivenza, cerca cibo immediatamente
+          // Se non stiamo già inseguendo cibo, o siamo in modalità sopravvivenza, cerca cibo immediatamente
         if (!targetingFood || survivalMode) {
             int effectiveRadius = searchRadius;
             // Raggio maggiore se non abbiamo trovato cibo da tempo o in modalità sopravvivenza
@@ -149,6 +199,18 @@ public class Vim extends main.Batterio{
                 effectiveRadius = searchRadius * 2;
             }
             searchForFood(effectiveRadius);
+            
+            // Se stiamo cercando cibo attivamente ma non lo troviamo, riorganizziamo in pattern X
+            if (!targetingFood && !isOnXPattern) {
+                if (Math.random() < 0.3) { // 30% di probabilità di riorganizzarsi ad X
+                    // Scegli casualmente tra pattern X centrale o negli angoli
+                    if (Math.random() < 0.5) {
+                        arrangeInXPatternFromCenter();
+                    } else {
+                        arrangeInXPatternFromCorner();
+                    }
+                }
+            }
         }
         // Altrimenti, cerca cibo periodicamente per trovare fonti migliori
         else if (moveCounter % 5 == 0) {
@@ -206,8 +268,7 @@ public class Vim extends main.Batterio{
             // Se abbiamo trovato del cibo, muoviamoci verso di esso
             if (this.targetingFood) {
                 moveTowardsFood();
-                
-                // Tecniche aggressive con cibo scarso: movimento più rapido
+                  // Tecniche aggressive con cibo scarso: movimento più rapido
                 if (conservationMode) {
                     // Triplo movimento verso il cibo quando è scarso (tecnica aggressiva)
                     moveTowardsFood();
@@ -219,6 +280,8 @@ public class Vim extends main.Batterio{
                 }
                 
                 sinceLastFood = 0; // Reset contatore
+                // Quando troviamo cibo, non siamo più sul pattern X
+                isOnXPattern = false;
             } else {
                 // Incrementa il tempo da quando non troviamo cibo
                 sinceLastFood++;
@@ -267,8 +330,7 @@ public class Vim extends main.Batterio{
         }
     }
 
-    
-    private void searchForFood(int radius) {
+      private void searchForFood(int radius) {
         int minDistance = Integer.MAX_VALUE;
         int bestX = -1;
         int bestY = -1;
@@ -316,6 +378,17 @@ public class Vim extends main.Batterio{
             this.targetingFood = true;
             this.targetX = bestX;
             this.targetY = bestY;
+            this.isOnXPattern = false; // Quando troviamo cibo, non siamo più sul pattern X
+        } else {
+            // Se non abbiamo trovato cibo, c'è una probabilità di organizzarsi nuovamente in pattern X
+            if (!isOnXPattern && Math.random() < 0.2) { // 20% di probabilità
+                // Se non si trova cibo, posiziona i batteri nuovamente ad X
+                if (Math.random() < 0.5) {
+                    arrangeInXPatternFromCenter();
+                } else {
+                    arrangeInXPatternFromCorner();
+                }
+            }
         }
     }
 
@@ -720,11 +793,11 @@ public class Vim extends main.Batterio{
 
         // Assicurati che il clone rimanga nei limiti dell'arena
         clone.x = Math.max(2, Math.min(Food.getWidth() - 3, clone.x));
-        clone.y = Math.max(2, Math.min(Food.getHeight() - 3, clone.y));
-        // Trasferisci le informazioni strategiche al clone
+        clone.y = Math.max(2, Math.min(Food.getHeight() - 3, clone.y));        // Trasferisci le informazioni strategiche al clone
         clone.hadAbundantFood = this.hadAbundantFood;
         clone.sinceLastFood = 0; // Il clone inizia fresco
         clone.conservationMode = this.conservationMode; // Condividi lo stato di conservazione
+        clone.isOnXPattern = this.isOnXPattern; // Trasferisci lo stato del pattern X
 
         // I cloni iniziano con un raggio di ricerca leggermente più alto rispetto al genitore
         clone.searchRadius = Math.min(this.searchRadius + 10, BASE_SEARCH_RADIUS * 2);
