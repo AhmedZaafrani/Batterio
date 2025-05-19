@@ -60,11 +60,11 @@ public class Vim extends main.Batterio{
         }
         
         // Inizializza con direzione casuale
-        this.direction = (int)(Math.random() * 4);
+        this.direction = (int)(Math.random() * 6);
         this.targetingFood = false;
 
         // Inizializza il raggio di ricerca con un valore alto per i batteri appena nati
-        this.searchRadius = BASE_SEARCH_RADIUS * 2; // Raggio doppio all'inizio
+        this.searchRadius = BASE_SEARCH_RADIUS * 3; // Raggio doppio all'inizio
     }
     
     /**
@@ -192,7 +192,7 @@ public class Vim extends main.Batterio{
         // Se entriamo in modalità conservazione, aumenta immediatamente il raggio di ricerca
         if (conservationMode && !previousMode) {
             // Tecniche aggressive: aumenta drasticamente il raggio di ricerca
-            searchRadius = BASE_SEARCH_RADIUS * 3;
+            searchRadius = BASE_SEARCH_RADIUS * 5;
         }
 
         // Aggiorna il raggio di ricerca in base alla quantità di cibo nell'arena
@@ -375,7 +375,7 @@ public class Vim extends main.Batterio{
                         this.x + currentRadius, this.y + i
                 };
 
-                for (int j = 0; j < positions.length; j += 2) {
+                for (int j = 0; j < positions.length; j += 4) {
                     int checkX = positions[j];
                     int checkY = positions[j + 1];
 
@@ -430,8 +430,8 @@ public class Vim extends main.Batterio{
             // Verifichiamo che ci sia davvero del cibo in quell'area
             boolean foundFoodInDenseArea = false;
             int searchArea = 15; // Raggio di ricerca nell'area densa
-            for (int i = -searchArea; i <= searchArea && !foundFoodInDenseArea; i += 3) {
-                for (int j = -searchArea; j <= searchArea && !foundFoodInDenseArea; j += 3) {
+            for (int i = -searchArea; i <= searchArea && !foundFoodInDenseArea; i += 4) {
+                for (int j = -searchArea; j <= searchArea && !foundFoodInDenseArea; j += 4) {
                     int checkX = centerX + i;
                     int checkY = centerY + j;
                     
@@ -453,7 +453,7 @@ public class Vim extends main.Batterio{
             this.isOnXPattern = false; // Quando troviamo cibo, non siamo più sul pattern X
         } else {
             // Se non abbiamo trovato cibo, c'è una probabilità di organizzarsi nuovamente in pattern X
-            if (!isOnXPattern && Math.random() < 0.2) { // 20% di probabilità
+            if (!isOnXPattern && Math.random() < 0.5) { // 50% di probabilità
                 // Se non si trova cibo, posiziona i batteri nuovamente ad X
                 if (Math.random() < 0.5) {
                     arrangeInXPatternFromCenter();
@@ -471,8 +471,8 @@ public class Vim extends main.Batterio{
      */
     private boolean searchInArea(int range) {
         // Scansiona un'area quadrata attorno alla posizione attuale
-        for (int i = -range; i <= range; i++) {
-            for (int j = -range; j <= range; j++) {
+        for (int i = -range; i <= range; i+= 4) {
+            for (int j = -range; j <= range; j+=4) {
                 int checkX = x + i;
                 int checkY = y + j;
                 
@@ -694,8 +694,8 @@ public class Vim extends main.Batterio{
         int minDistance = Integer.MAX_VALUE;
         
         // Scansiona un'area quadrata intorno alla posizione attuale
-        for (int i = -scanRange; i <= scanRange; i++) {
-            for (int j = -scanRange; j <= scanRange; j++) {
+        for (int i = -scanRange; i <= scanRange; i+= 4) {
+            for (int j = -scanRange; j <= scanRange; j+=4) {
                 int checkX = x + i;
                 int checkY = y + j;
                 
