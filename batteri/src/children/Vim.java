@@ -67,9 +67,6 @@ public class Vim extends main.Batterio{
         this.searchRadius = BASE_SEARCH_RADIUS * 3; // Raggio doppio all'inizio
     }
     
-    /**
-     * Posiziona il batterio in un pattern X centrato nell'arena
-     */
     private void arrangeInXPatternFromCenter() {
         int centerX = Food.getWidth() / 2;
         int centerY = Food.getHeight() / 2;
@@ -96,9 +93,6 @@ public class Vim extends main.Batterio{
         isOnXPattern = true;
     }
     
-    /**
-     * Posiziona il batterio in un pattern X centrato in uno degli angoli dell'arena
-     */
     private void arrangeInXPatternFromCorner() {
         // Seleziona un angolo casuale
         int corner = (int)(Math.random() * 4);
@@ -157,10 +151,10 @@ public class Vim extends main.Batterio{
         isOnXPattern = true;
     }
 
-    // Controlla se la quantità di cibo è abbondante
     private boolean isFoodAbundant() {
         return Food.getFoodQuantity() > ABUNDANT_FOOD_max;
-    }    @Override
+    }    
+    @Override
     protected void move() {
         // Decrementa il cooldown del teletrasporto se necessario
         if (teleportCooldown > 0) {
@@ -315,7 +309,6 @@ public class Vim extends main.Batterio{
         avoidBorders();
     }
 
-    // Nuovo metodo per evitare i bordi
     private void avoidBorders() {
         if (x <= 2) {
             x = 3;
@@ -355,14 +348,10 @@ public class Vim extends main.Batterio{
         int bestX = -1;
         int bestY = -1;
         
-        // Controlla se ci sono gruppi di cibo invece che singole unità
-        // Utilizziamo una mappa per tenere traccia della densità di cibo nelle diverse aree
         int[][] foodDensity = new int[5][5]; // Dividiamo l'arena in una griglia 5x5
         int gridWidth = Food.getWidth() / 5;
         int gridHeight = Food.getHeight() / 5;
-        
-        // Ottimizzazione: ricerca più rapida con incremento dinamico
-        // Utilizza incremento minore per raggi più piccoli per maggiore precisione
+       
         for (int currentRadius = 1; currentRadius <= radius; currentRadius += Math.max(2, currentRadius/10)) {
             // Ricerca più intensiva sui raggi inferiori per trovare cibo vicino più rapidamente
             int step = Math.max(2, currentRadius/8); // Incremento dinamico
@@ -727,11 +716,6 @@ public class Vim extends main.Batterio{
             searchForFood(BASE_SEARCH_RADIUS);
         }
     }
-    /**
-     * Riduce la salute del batterio di un valore specificato
-     * Utilizza riflessione per accedere al campo privato health nella classe parent
-     * @param amount la quantità di salute da diminuire
-     */
     private void decreaseHealth(int amount) {
         // Accediamo direttamente alla proprietà health nella classe genitore
         try {
@@ -751,12 +735,7 @@ public class Vim extends main.Batterio{
         }
     }
 
-    /**
-     * Permette al batterio di teletrasportarsi in un'altra posizione dell'arena
-     * Ha un costo energetico e un tempo di ricarica
-     * @param targetedTeleport se true, tenta di teletrasportarsi verso del cibo rilevato
-     * @return true se il teletrasporto è avvenuto con successo, false altrimenti
-     */
+    
     public boolean teleport(boolean targetedTeleport) {
         // Verifica se il batterio può teletrasportarsi (cooldown e salute sufficienti)
         if (teleportCooldown > 0 || this.getHealth() < TELEPORT_ENERGY_COST + 10) {
@@ -817,8 +796,6 @@ public class Vim extends main.Batterio{
                         y = Food.getHeight() - margin - (int)(Math.random() * margin);
                         break;
                 }
-                
-                // Cerca cibo nella nuova posizione
                 searchForFood(BASE_SEARCH_RADIUS);
                 if (targetingFood) {
                     foundFood = true;
@@ -850,10 +827,6 @@ public class Vim extends main.Batterio{
     public Batterio clone() throws CloneNotSupportedException {
         Vim clone = (Vim) super.clone();
 
-        // Clonazione potenziata in caso di cibo abbondante o se abbiamo individuato cibo
-        // Il valore di base verrà impostato automaticamente dal clone() nella classe padre
-
-        // Strategia di posizionamento intelligente in base alle circostanze
         int variationX = 0;
         int variationY = 0;
 
