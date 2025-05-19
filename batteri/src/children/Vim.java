@@ -419,8 +419,8 @@ public class Vim extends main.Batterio{
             // Verifichiamo che ci sia davvero del cibo in quell'area
             boolean foundFoodInDenseArea = false;
             int searchArea = 15; // Raggio di ricerca nell'area densa
-            for (int i = -searchArea; i <= searchArea && !foundFoodInDenseArea; i += 4) {
-                for (int j = -searchArea; j <= searchArea && !foundFoodInDenseArea; j += 4) {
+            for (int i = -searchArea; i <= searchArea && !foundFoodInDenseArea; i += 100) {
+                for (int j = -searchArea; j <= searchArea && !foundFoodInDenseArea; j += 100) {
                     int checkX = centerX + i;
                     int checkY = centerY + j;
                     
@@ -453,11 +453,7 @@ public class Vim extends main.Batterio{
         }
     }
     
-    /**
-     * Cerca cibo in un'area ristretta attorno alla posizione attuale
-     * @param range il raggio di ricerca
-     * @return true se è stato trovato del cibo
-     */
+    
     private boolean searchInArea(int range) {
         // Scansiona un'area quadrata attorno alla posizione attuale
         for (int i = -range; i <= range; i+= 4) {
